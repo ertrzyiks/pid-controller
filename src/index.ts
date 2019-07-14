@@ -8,21 +8,24 @@ export interface PIDTune {
 export class Controller {
   private previousError: number = 0
   private integral: number = 0
-  private targetValue: number
+  private ignoreIntegral: boolean = false
+  private isSaturating: boolean = false
+
   private tune: PIDTune
 
-  constructor(tune: PIDTune, initialTargetValue: number = 0) {
+  constructor(tune: PIDTune) {
     this.tune = tune
-    this.targetValue = initialTargetValue
   }
 
-  setTarget(targetValue: number) {
-    this.targetValue = targetValue
+  setSaturating(isSaturating: boolean) {
+    this.isSaturating = isSaturating
   }
 
-  update(currentValue: number, dt: number) {
-    const error = this.targetValue - currentValue
-    this.integral = this.integral + error * dt
+  update(currentValue: number, targetValue: number, dt: number) {
+    const error = targetValue - currentValue
+    if (!this.ignoreIntegral) {
+      this.integral = this.integral + error * dt
+    }
 
     const derivative = (error - this.previousError) / dt
     this.previousError = error
@@ -31,6 +34,9 @@ export class Controller {
     const Iout = this.integral * this.tune.i
     const Dout = derivative * this.tune.d
 
-    return Pout + Iout + Dout
+    const output = Pout + Iout + Dout
+
+    this.ignoreIntegral = this.isSaturating && (output > 0) === (this.integral > 0)
+    return output
   }
 }
